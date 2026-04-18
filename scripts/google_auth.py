@@ -1,19 +1,14 @@
 """
 One-time script to authorize Google Tasks access and store tokens in the DB.
+Works on headless servers (EC2) — no browser required on the server.
 
-Usage:
-  1. Download OAuth2 Desktop App credentials from Google Cloud Console
-     and save as credentials.json in the project root.
-  2. Run: uv run python scripts/google_auth.py
-  3. Complete the browser consent flow.
-  4. Tokens are saved to the database automatically.
+Usage: uv run python scripts/google_auth.py
 """
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
-# Allow running from project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
@@ -26,6 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models import Base, GoogleToken
 
 SCOPES = ["https://www.googleapis.com/auth/tasks.readonly"]
+REDIRECT_URI = "http://localhost:1"  # won't load, but Google echoes the code in the URL
 
 
 def main():
@@ -39,15 +35,26 @@ def main():
         "installed": {
             "client_id": client_id,
             "client_secret": client_secret,
-            "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"],
+            "redirect_uris": [REDIRECT_URI, "http://localhost"],
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
         }
     }
 
-    print("Opening browser for Google authorization...")
     flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
-    creds = flow.run_local_server(port=0)
+    flow.redirect_uri = REDIRECT_URI
+
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+
+    print("\n1. Open this URL in your browser:\n")
+    print(f"   {auth_url}\n")
+    print("2. Approve access. Your browser will show a 'connection refused' page — that's expected.")
+    print("3. Copy the full URL from your browser's address bar and paste it below.\n")
+
+    redirect_response = input("Paste the redirect URL: ").strip()
+
+    flow.fetch_token(authorization_response=redirect_response)
+    creds = flow.credentials
 
     db_url = os.getenv("DATABASE_URL", "sqlite:///./data/coach.db")
     os.makedirs("data", exist_ok=True)
@@ -74,7 +81,7 @@ def main():
 
     db.commit()
     db.close()
-    print("Google OAuth tokens saved to database.")
+    print("\nGoogle OAuth tokens saved to database.")
 
 
 if __name__ == "__main__":

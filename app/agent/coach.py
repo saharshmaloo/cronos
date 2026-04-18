@@ -7,8 +7,9 @@ from app.models import Message
 
 
 HOURLY_INJECTION = (
-    "[SYSTEM: This is an automated hourly check-in. Generate a brief, warm journal prompt "
-    "for the user. Consider their open tasks. Keep it to 1-2 sentences max.]"
+    "[SYSTEM: Hourly check-in. Ask the user what they have been doing since the last check-in. "
+    "Be direct and demanding — reference their open tasks and call them out if they should have "
+    "been working on something specific. 1-2 sentences max.]"
 )
 
 
@@ -25,7 +26,9 @@ def generate_coach_response(
         f"{tone}\n\n"
         f"Current date/time: {datetime.now().strftime('%A, %B %d %Y %I:%M %p %Z')}\n\n"
         f"User's open tasks:\n{tasks_text}\n\n"
-        "Keep replies concise — 2-3 sentences max."
+        "Keep replies concise — 2-3 sentences max. "
+        "When the user tells you what they've been doing, give immediate blunt feedback on it — "
+        "call them out if it's not good enough, push them harder if it is."
     )
 
     limit = settings.context_window_messages

@@ -41,6 +41,7 @@ def main():
         }
     }
 
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
     flow.redirect_uri = REDIRECT_URI
 

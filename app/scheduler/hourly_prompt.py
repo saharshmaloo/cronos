@@ -2,12 +2,12 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from app.config import get_app_config, set_app_config
+from app.config import get_settings, get_app_config, set_app_config
 from app.database import get_session_factory
 from app.models import Message
 from app.agent.coach import generate_coach_response
 from app.integrations.google_tasks import fetch_active_tasks
-from app.integrations.twilio_client import send_sms
+from app.integrations.telegram_client import send_message
 
 logger = logging.getLogger(__name__)
 
@@ -56,20 +56,26 @@ def send_hourly_prompt() -> None:
             logger.info("%d unanswered prompts — pausing until %s UTC", unanswered, resume_at)
             return
 
+        settings = get_settings()
+        chat_id = settings.telegram_chat_id or get_app_config("telegram_chat_id", db) or ""
+        if not chat_id:
+            logger.warning("Hourly prompt skipped — no telegram_chat_id configured yet")
+            return
+
         tasks_text = fetch_active_tasks(db)
         prompt_text = generate_coach_response(db, tasks_text=tasks_text, user_message=None)
-        sid = send_sms(prompt_text)
+        msg_id = send_message(prompt_text, chat_id=chat_id)
 
         db.add(Message(
             direction="outbound",
             role="assistant",
             body=prompt_text,
             message_type="hourly_check_in",
-            twilio_sid=sid,
+            twilio_sid=str(msg_id) if msg_id else None,
             created_at=datetime.utcnow(),
         ))
         db.commit()
-        logger.info("Hourly prompt sent: sid=%s", sid)
+        logger.info("Hourly prompt sent: msg_id=%s", msg_id)
 
     except Exception:
         logger.exception("Failed to send hourly prompt")

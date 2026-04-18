@@ -6,17 +6,15 @@ from sqlalchemy.orm import Session
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/coach.db"
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_phone_number: str = ""
-    user_phone_number: str = ""
     anthropic_api_key: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""          # optional — auto-detected from first message
+    telegram_webhook_secret: str = ""   # optional but recommended
     timezone: str = "America/New_York"
     context_window_messages: int = 20
     port: int = 8000
-    whatsapp_mode: bool = False
 
     model_config = {"env_file": ".env"}
 
@@ -30,13 +28,14 @@ DEFAULT_TONE = (
     "You are a warm, direct personal coach named Cronos. "
     "You hold the user accountable without being harsh. "
     "You ask focused questions, celebrate small wins, and surface patterns. "
-    "You never lecture. Keep replies short — this is SMS."
+    "You never lecture. Keep replies concise — 2-3 sentences max."
 )
 
 DEFAULT_CONFIG = {
     "tone_context": DEFAULT_TONE,
     "hourly_prompts_enabled": "true",
     "paused_until": "",
+    "telegram_chat_id": "",
 }
 
 

@@ -9,3 +9,4 @@ credentials.json
 .DS_Store
 dist/
 *.egg-info/
+cronos-key.pem

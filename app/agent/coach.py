@@ -1,6 +1,6 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import anthropic
-import pytz
 from sqlalchemy.orm import Session
 
 from app.config import get_settings, get_app_config, DEFAULT_TONE
@@ -25,7 +25,7 @@ def generate_coach_response(
     tone = get_app_config("tone_context", db) or DEFAULT_TONE
     system = (
         f"{tone}\n\n"
-        f"Current date/time: {datetime.now(pytz.timezone(settings.timezone)).strftime('%A, %B %d %Y %I:%M %p %Z')}\n\n"
+        f"Current date/time: {datetime.now(ZoneInfo(settings.timezone)).strftime('%A, %B %d %Y %I:%M %p %Z')}\n\n"
         f"User's open tasks:\n{tasks_text}\n\n"
         "Keep replies concise — 2-3 sentences max. "
         "When the user tells you what they've been doing, give immediate blunt feedback on it — "

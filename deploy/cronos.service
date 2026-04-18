@@ -1,0 +1,15 @@
+[Unit]
+Description=Cronos SMS Coach
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/cronos
+EnvironmentFile=/opt/cronos/.env
+ExecStartPre=/home/ubuntu/.local/bin/uv run alembic upgrade head
+ExecStart=/home/ubuntu/.local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

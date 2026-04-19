@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-import anthropic
+from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.config import get_settings, get_app_config, DEFAULT_TONE
@@ -30,7 +30,7 @@ def _get_recent_ratings_text(db: Session, n: int = 7) -> str:
 
 def generate_daily_rating(db: Session, tasks_text: str) -> tuple[str, str]:
     settings = get_settings()
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    client = OpenAI(api_key=settings.deepseek_api_key, base_url="https://api.deepseek.com")
 
     tz = ZoneInfo(settings.timezone)
     now_local = datetime.now(tz)
@@ -77,14 +77,16 @@ def generate_daily_rating(db: Session, tasks_text: str) -> tuple[str, str]:
         f"Today's conversation log:\n{conversation_text}"
     )
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="deepseek-chat",
         max_tokens=100,
-        system=system,
-        messages=[{"role": "user", "content": user_content}],
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
     )
 
-    lines = response.content[0].text.strip().split("\n", 1)
+    lines = response.choices[0].message.content.strip().split("\n", 1)
     rating = lines[0].strip().lower()
     if rating not in ("better", "neutral", "worse"):
         rating = "neutral"
@@ -99,7 +101,7 @@ def generate_coach_response(
     user_message: str | None = None,
 ) -> str:
     settings = get_settings()
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    client = OpenAI(api_key=settings.deepseek_api_key, base_url="https://api.deepseek.com")
 
     tone = get_app_config("tone_context", db) or DEFAULT_TONE
     ratings_text = _get_recent_ratings_text(db)
@@ -129,11 +131,10 @@ def generate_coach_response(
     else:
         messages.append({"role": "user", "content": HOURLY_INJECTION})
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="deepseek-chat",
         max_tokens=300,
-        system=system,
-        messages=messages,
+        messages=[{"role": "system", "content": system}, *messages],
     )
 
-    return response.content[0].text
+    return response.choices[0].message.content

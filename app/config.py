@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/coach.db"
-    anthropic_api_key: str = ""
+    deepseek_api_key: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
     telegram_bot_token: str = ""

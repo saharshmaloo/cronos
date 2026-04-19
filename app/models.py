@@ -49,3 +49,13 @@ class AppConfig(Base):
     key = Column(String(100), primary_key=True)
     value = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DailyRating(Base):
+    __tablename__ = "daily_ratings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(String(10), nullable=False, unique=True)  # YYYY-MM-DD in user's timezone
+    rating = Column(String(10), nullable=False)              # 'better' | 'neutral' | 'worse'
+    summary = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

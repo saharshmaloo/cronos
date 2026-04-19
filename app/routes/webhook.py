@@ -1,12 +1,13 @@
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request, Response
 from sqlalchemy.orm import Session
 
 from app.config import get_settings, get_app_config, set_app_config
 from app.database import get_session_factory
-from app.models import Message
-from app.agent.coach import generate_coach_response
+from app.models import Message, DailyRating
+from app.agent.coach import generate_coach_response, generate_daily_rating
 from app.integrations.google_tasks import fetch_active_tasks
 from app.integrations.telegram_client import send_message
 
@@ -88,6 +89,33 @@ async def telegram_webhook(request: Request):
         db.commit()
 
         tasks_text = fetch_active_tasks(db)
+
+        if text.lower() == "/rate":
+            rating, summary = generate_daily_rating(db, tasks_text)
+            today_str = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y-%m-%d")
+
+            existing = db.query(DailyRating).filter(DailyRating.date == today_str).first()
+            if existing:
+                existing.rating = rating
+                existing.summary = summary
+            else:
+                db.add(DailyRating(date=today_str, rating=rating, summary=summary))
+
+            arrow = {"better": "↑", "neutral": "→", "worse": "↓"}[rating]
+            reply_text = f"{arrow} {rating.capitalize()}\n{summary}"
+            msg_id = send_message(reply_text, chat_id=resolved)
+
+            db.add(Message(
+                direction="outbound",
+                role="assistant",
+                body=reply_text,
+                message_type="daily_rating",
+                twilio_sid=str(msg_id) if msg_id else None,
+                created_at=datetime.utcnow(),
+            ))
+            db.commit()
+            return Response(status_code=200)
+
         reply_text = generate_coach_response(db, tasks_text=tasks_text, user_message=text)
 
         msg_id = send_message(reply_text, chat_id=resolved)

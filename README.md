@@ -11,6 +11,7 @@ A personal coaching app delivered entirely through Telegram. Cronos checks in wi
 - **On-demand conversation**: Message it any time for accountability, task prioritization, or a reality check.
 - **Pause logic**: If you don't respond to 2 consecutive hourly prompts, it backs off for 8 hours. The moment you message it, prompts resume.
 - **Context-aware**: Every response is informed by your Google Tasks, your conversation history, and a programmable tone/personality.
+- **Daily rating**: At the end of each day, Cronos rates your performance relative to your recent baseline — `better`, `neutral`, or `worse` — with a one-sentence justification. Ratings are injected into future check-ins so the coach can hold a longer-term standard.
 
 ---
 
@@ -245,6 +246,7 @@ This updates the tone in the database immediately without a restart.
 | `google_tokens` | OAuth2 access + refresh tokens for Google Tasks |
 | `tasks_cache` | Local snapshot of Google Tasks, refreshed each Claude call |
 | `app_config` | Key-value settings: tone, pause state, hourly toggle, chat ID |
+| `daily_ratings` | End-of-day performance ratings (`better` / `neutral` / `worse`) with one-sentence summary |
 
 ### Useful SQLite queries
 
@@ -261,3 +263,58 @@ sqlite3 data/coach.db "UPDATE app_config SET value = '' WHERE key = 'paused_unti
 # Check current tone
 sqlite3 data/coach.db "SELECT value FROM app_config WHERE key = 'tone_context';"
 ```
+
+---
+
+## Extensions
+
+### Accountability Partner
+
+Add a second Telegram chat ID that receives a daily digest — daily rating, summary, and any missed check-ins — without having access to the full conversation log.
+
+**What to build:**
+
+- Add `TELEGRAM_PARTNER_CHAT_ID` to `.env` and `config.py`.
+- In `scheduler/hourly_prompt.py`, after recording a missed check-in, send a nudge to the partner chat: `"[user] missed their check-in at 3 PM."`.
+- At end-of-day (alongside the daily rating job), call `telegram_client.send_message(partner_chat_id, digest)` where the digest is the rating + summary from `generate_daily_rating`.
+- Optionally forward inbound messages from the partner's chat ID to the main user as a relay (tag them `[partner]` in the system prompt so the coach knows the source).
+
+**Schema changes:** none required — partner chat ID lives in env/config. If you want the partner to send commands (e.g. `/streak`), add a `partner_chat_id` key to `app_config` so it can be toggled at runtime.
+
+---
+
+### Multi-User Support
+
+Run one bot for multiple independent users, each with their own conversation history, Google Tasks OAuth, config, and daily ratings.
+
+**What to build:**
+
+**1. Add a `user_id` (Telegram chat ID) column to every per-user table:**
+
+```sql
+ALTER TABLE messages    ADD COLUMN user_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE google_tokens ADD COLUMN user_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks_cache ADD COLUMN user_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_config  ADD COLUMN user_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE daily_ratings ADD COLUMN user_id TEXT NOT NULL DEFAULT '';
+```
+
+Create a new Alembic migration for this. All existing queries must be scoped by `user_id`.
+
+**2. Route every webhook event by `chat_id`:**
+
+In `routes/webhook.py`, extract `chat_id` from the Telegram payload and pass it through to every DB query and coach call. Remove the global `TELEGRAM_CHAT_ID` env var — any Telegram user who messages the bot gets their own session auto-provisioned.
+
+**3. Per-user Google OAuth:**
+
+`scripts/google_auth.py` must accept a `--user-id` flag and store the resulting token under that `user_id` in `google_tokens`. At runtime, `google_tasks.py` looks up the token by `user_id`.
+
+**4. Scheduler:**
+
+The hourly job currently sends one message. Replace it with a loop over all distinct `user_id` values that have `hourly_prompts_enabled = true`, running the existing per-user check-in logic for each.
+
+**5. `app_config` composite key:**
+
+Change the primary key from `(key)` to `(user_id, key)` so each user has independent tone, pause state, etc.
+
+**Minimal path:** scope `messages`, `app_config`, and `google_tokens` by `user_id` first. `tasks_cache` and `daily_ratings` follow the same pattern and can come later.

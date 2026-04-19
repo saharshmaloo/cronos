@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""          # optional — auto-detected from first message
     telegram_webhook_secret: str = ""   # optional but recommended
     timezone: str = "America/New_York"
-    context_window_messages: int = 20
+    context_window_messages: int = 10
     port: int = 8000
 
     model_config = {"env_file": ".env"}

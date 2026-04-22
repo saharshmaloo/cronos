@@ -78,7 +78,7 @@ def generate_daily_rating(db: Session, tasks_text: str) -> tuple[str, str]:
     )
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-reasoner",
         max_tokens=100,
         messages=[
             {"role": "system", "content": system},
@@ -132,7 +132,7 @@ def generate_coach_response(
         messages.append({"role": "user", "content": HOURLY_INJECTION})
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-reasoner",
         max_tokens=300,
         messages=[{"role": "system", "content": system}, *messages],
     )

@@ -40,6 +40,7 @@ def send_hourly_prompt() -> None:
             return
 
         # Check if paused
+        just_resumed = False
         paused_until_str = get_app_config("paused_until", db) or ""
         if paused_until_str:
             paused_until = datetime.fromisoformat(paused_until_str)
@@ -47,14 +48,16 @@ def send_hourly_prompt() -> None:
                 logger.info("Hourly prompt skipped — paused until %s UTC", paused_until)
                 return
             set_app_config("paused_until", "", db)
+            just_resumed = True
 
-        # Check consecutive unanswered prompts
-        unanswered = _unanswered_prompt_count(db)
-        if unanswered >= MAX_UNANSWERED:
-            resume_at = datetime.utcnow() + timedelta(hours=PAUSE_HOURS)
-            set_app_config("paused_until", resume_at.isoformat(), db)
-            logger.info("%d unanswered prompts — pausing until %s UTC", unanswered, resume_at)
-            return
+        # Check consecutive unanswered prompts (skip after a resume — treat it as a fresh start)
+        if not just_resumed:
+            unanswered = _unanswered_prompt_count(db)
+            if unanswered >= MAX_UNANSWERED:
+                resume_at = datetime.utcnow() + timedelta(hours=PAUSE_HOURS)
+                set_app_config("paused_until", resume_at.isoformat(), db)
+                logger.info("%d unanswered prompts — pausing until %s UTC", unanswered, resume_at)
+                return
 
         settings = get_settings()
         chat_id = settings.telegram_chat_id or get_app_config("telegram_chat_id", db) or ""

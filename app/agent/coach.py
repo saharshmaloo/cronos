@@ -126,6 +126,8 @@ def generate_coach_response(
 
     messages = [{"role": msg.role, "content": msg.body} for msg in history]
 
+    if messages and messages[-1]["role"] == "user":
+        messages.append({"role": "assistant", "content": "..."})
     messages.append({"role": "user", "content": f"[Current open tasks:\n{tasks_text}]"})
     messages.append({"role": "assistant", "content": "Understood."})
 

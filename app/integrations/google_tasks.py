@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -89,13 +90,25 @@ def fetch_active_tasks(db: Session) -> str:
     if not all_tasks:
         return "No open tasks."
 
+    settings = get_settings()
+    tz = ZoneInfo(settings.timezone)
+    today = datetime.now(tz).date()
+
     lines = []
     for task in all_tasks:
         due_str = ""
         if task.get("due"):
             try:
-                due_dt = datetime.fromisoformat(task["due"].replace("Z", "+00:00"))
-                due_str = f" (due {due_dt.strftime('%b %d')})"
+                due_date = datetime.fromisoformat(task["due"].replace("Z", "+00:00")).date()
+                delta = (due_date - today).days
+                if delta < 0:
+                    due_str = f" (overdue by {-delta}d)"
+                elif delta == 0:
+                    due_str = " (due today)"
+                elif delta == 1:
+                    due_str = " (due tomorrow)"
+                else:
+                    due_str = f" (due in {delta}d)"
             except ValueError:
                 pass
         lines.append(f"- [ ] {task.get('title', '(untitled)')}{due_str}")
